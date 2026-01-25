@@ -31,6 +31,7 @@
             letter-spacing: -1px;
             background: linear-gradient(to bottom right, #fff, #888);
             -webkit-background-clip: text;
+            background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
@@ -320,7 +321,7 @@
             statusDot.classList.add('loading');
             latestResult.innerText = "THINKING...";
 
-            const blob = new Blob(videoBlobs, { type: 'video/webm' });
+            const blob = new Blob(videoBlobs, { type: mediaRecorder.mimeType });
             const formData = new FormData();
             formData.append('file', blob, 'clip.webm');
 
