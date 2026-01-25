@@ -4,490 +4,397 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MediaPipe Face Mesh - Lip Reading</title>
+    <title>CHAPLIN | Silent Speech Interface</title>
     <style>
+        :root {
+            --primary: #00ff88;
+            --bg: #0a0a0a;
+            --card-bg: #111;
+            --text: #fff;
+        }
+
         body {
             margin: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
-            background: #0a0a0a;
-            color: white;
-            font-family: system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', system-ui, sans-serif;
             min-height: 100vh;
-            padding: 20px;
-            box-sizing: border-box;
+            padding: 40px 20px;
         }
 
         h1 {
-            margin: 0 0 20px 0;
-            font-weight: 500;
-            font-size: 1.5rem;
+            margin: 0 0 10px 0;
+            font-weight: 700;
+            letter-spacing: -1px;
+            background: linear-gradient(to bottom right, #fff, #888);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
-        /* Container positions canvas overlay on top of video */
-        .video-container {
+        .status-header {
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .main-container {
+            display: grid;
+            grid-template-columns: 640px 350px;
+            gap: 20px;
+            max-width: 1100px;
+        }
+
+        .video-wrapper {
             position: relative;
-            border-radius: 12px;
+            background: #000;
+            border-radius: 16px;
             overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            border: 1px solid #222;
         }
 
         video,
         canvas {
             display: block;
+            width: 640px;
+            height: 480px;
         }
 
-        /* Canvas sits exactly on top of video */
         canvas {
             position: absolute;
             top: 0;
             left: 0;
+            pointer-events: none;
         }
 
-        /* =============================================
-       PREDICTION OUTPUT BOX - Real-time lip reading
-       ============================================= */
-        .prediction-container {
-            margin-top: 24px;
-            width: 640px;
-            max-width: 100%;
-        }
-
-        .prediction-label {
-            font-size: 0.875rem;
-            color: #888;
-            margin-bottom: 8px;
+        /* Sidebar Styling */
+        .sidebar {
             display: flex;
-            align-items: center;
-            gap: 8px;
+            flex-direction: column;
+            gap: 20px;
         }
 
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #333;
-            transition: background 0.2s;
-        }
-
-        .status-dot.active {
-            background: #00ff88;
-            box-shadow: 0 0 8px #00ff88;
-        }
-
-        /* Main prediction display box */
-        #prediction-box {
-            background: #111;
+        .card {
+            background: var(--card-bg);
             border: 1px solid #222;
-            border-radius: 8px;
-            padding: 20px 24px;
-            min-height: 60px;
+            border-radius: 16px;
+            padding: 20px;
             display: flex;
-            align-items: center;
-            justify-content: center;
+            flex-direction: column;
         }
 
-        /* High-contrast detected word text - large and readable for live demo */
-        #detected-word {
-            font-size: 3rem;
+        .card-header {
+            font-size: 0.75rem;
+            color: var(--primary);
             font-weight: 700;
-            color: #00ff88;
-            /* Bright green for high contrast on dark */
-            text-align: center;
-            text-shadow: 0 0 30px rgba(0, 255, 136, 0.4);
-            letter-spacing: 0.03em;
-            transition: color 0.15s, text-shadow 0.15s;
+            margin-bottom: 15px;
             text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
-        /* Muted state when no confident prediction */
-        #detected-word.no-detection {
+        #transcript-log {
+            height: 350px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 5px;
+        }
+
+        .log-entry {
+            background: #1a1a1a;
+            padding: 12px 16px;
+            border-radius: 10px;
+            border-left: 3px solid var(--primary);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .log-time {
+            font-size: 0.65rem;
             color: #444;
-            text-shadow: none;
+            margin-bottom: 4px;
         }
 
-        /* =============================================
-       RECORD BUTTON
-       ============================================= */
-        .record-button-container {
-            margin-top: 20px;
-            width: 640px;
-            max-width: 100%;
+        .log-text {
+            font-size: 1rem;
+            font-weight: 500;
+            color: #eee;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .controls {
+            margin-top: 30px;
             display: flex;
             justify-content: center;
         }
 
         #record-btn {
-            padding: 16px 48px;
-            font-size: 1.25rem;
-            font-weight: 600;
-            border: none;
-            border-radius: 8px;
+            padding: 18px 60px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            background: transparent;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+            border-radius: 100px;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.2s;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 1px;
         }
 
-        /* Default "Record" state */
-        #record-btn.record-state {
-            background: #1a1a1a;
-            color: #00ff88;
-            border: 2px solid #00ff88;
+        #record-btn:hover {
+            background: rgba(0, 255, 136, 0.1);
+            transform: scale(1.02);
         }
 
-        #record-btn.record-state:hover {
-            background: #00ff88;
-            color: #0a0a0a;
-        }
-
-        /* Active "Stop" state (recording in progress) */
-        #record-btn.stop-state {
-            background: #ff3030;
+        #record-btn.active {
+            background: #ef4444;
+            border-color: #ef4444;
             color: white;
-            border: 2px solid #ff3030;
-            animation: pulse 1s infinite;
-        }
-
-        #record-btn.stop-state:hover {
-            background: #cc2020;
-            border-color: #cc2020;
+            animation: pulse 1.5s infinite;
         }
 
         @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 15px rgba(239, 68, 68, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+            }
+        }
+
+        /* Loading Indicator */
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            color: #888;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            background: #333;
+            border-radius: 50%;
+        }
+
+        .dot.loading {
+            background: var(--primary);
+            box-shadow: 0 0 10px var(--primary);
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
 
             0%,
             100% {
-                box-shadow: 0 0 0 0 rgba(255, 48, 48, 0.4);
+                opacity: 1;
             }
 
             50% {
-                box-shadow: 0 0 0 10px rgba(255, 48, 48, 0);
+                opacity: 0.3;
             }
         }
     </style>
 </head>
 
 <body>
-    <h1>Lip Reading - Real-time Prediction</h1>
+    <h1>CHAPLIN</h1>
+    <div class="status-header">Visual Speech Recognition System</div>
 
-    <div class="video-container">
-        <!-- Video element for webcam feed -->
-        <video id="video" width="640" height="480" autoplay playsinline></video>
-        <!-- Canvas overlay for drawing the mesh -->
-        <canvas id="canvas" width="640" height="480"></canvas>
-    </div>
-
-    <!-- =============================================
-       DETECTED SPEECH OUTPUT BOX
-       Updates every frame with predicted word
-       ============================================= -->
-    <div class="prediction-container">
-        <div class="prediction-label">
-            <span class="status-dot" id="status-dot"></span>
-            <span>Detected Speech</span>
+    <div class="main-container">
+        <!-- Viewport -->
+        <div class="video-wrapper">
+            <video id="video" autoplay playsinline></video>
+            <canvas id="canvas"></canvas>
         </div>
 
-        <!-- Main prediction display - shows predictedWord variable -->
-        <div id="prediction-box">
-            <span id="detected-word">—</span>
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="card">
+                <div class="card-header">Target Word / Sentence</div>
+                <div id="latest-result"
+                    style="font-size: 1.8rem; font-weight: 800; color: #fff; text-align: center; padding: 20px 10px; border: 2px dashed #222; border-radius: 12px; min-height: 80px; display: flex; align-items: center; justify-content: center;">
+                    READY
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">System Status</div>
+                <div class="status-indicator">
+                    <div id="status-dot" class="dot"></div>
+                    <span id="status-text">Idle</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">History</div>
+                <div id="transcript-log">
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Record/Stop toggle button -->
-    <div class="record-button-container">
-        <button id="record-btn" class="record-state">Record</button>
+    <div class="controls">
+        <button id="record-btn">Hold to Record</button>
     </div>
 
-    <!-- Load MediaPipe dependencies from CDN -->
+    <!-- MediaPipe Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
         crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 
     <script>
-        // ============================================
-        // CONFIGURATION
-        // ============================================
+        const videoElement = document.getElementById('video');
+        const canvasElement = document.getElementById('canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const logContainer = document.getElementById('transcript-log');
+        const statusText = document.getElementById('status-text');
+        const statusDot = document.getElementById('status-dot');
+        const recordBtn = document.getElementById('record-btn');
 
-        // Confidence threshold: only display predictions above this value
-        const CONFIDENCE_THRESHOLD = 0.6;
-
-        // ============================================
-        // LANDMARK INDICES FOR LIPS
-        // ============================================
-        // MediaPipe Face Mesh has 468 landmarks total.
-        // These specific indices correspond to lip contours.
-
-        // All lip landmarks (42 points) in the exact order the ML model expects
+        const latestResult = document.getElementById('latest-result');
         const ALL_LIP_INDICES = [
             61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95, 78,
             185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 308, 415, 310, 311, 312, 13, 82, 81, 80, 191
         ];
 
-        // ============================================
-        // DOM ELEMENTS
-        // ============================================
-        const videoElement = document.getElementById('video');
-        const canvasElement = document.getElementById('canvas');
-        const canvasCtx = canvasElement.getContext('2d');
-        const detectedWordElement = document.getElementById('detected-word');
-        const statusDot = document.getElementById('status-dot');
+        let mediaRecorder;
+        let videoBlobs = [];
+        let isFirstLog = true;
 
-        // ============================================
-        // PREDICTED WORD VARIABLE
-        // ============================================
-        let predictedWord = "—";
-        let aiRefinement = "";
-
-        // ============================================
-        // RECORDING STATE
-        // ============================================
-        let isRecording = false;
-        let recordedFrames = [];
-        const recordBtn = document.getElementById('record-btn');
-
-        // ============================================
-        // EXTRACT LIP LANDMARKS
-        // ============================================
-        function extractLipLandmarks(faceLandmarks) {
-            // Returns just [x, y] coordinates in the correct order for the backend
-            return ALL_LIP_INDICES.map(index => {
-                const landmark = faceLandmarks[index];
-                return [landmark.x, landmark.y];
-            });
+        async function setupRecorder() {
+            const stream = videoElement.srcObject;
+            const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp8') ? 'video/webm;codecs=vp8' : 'video/mp4';
+            mediaRecorder = new MediaRecorder(stream, { mimeType: mime });
+            mediaRecorder.ondataavailable = e => { if (e.data.size > 0) videoBlobs.push(e.data); };
         }
 
-        // ============================================
-        // LIP READING MODEL INTEGRATION
-        // ============================================
-        async function predictFromLipMovement(lipCoordinates) {
-            // In live mode, we just show "..." if the lips are moving
-            const topLip = lipCoordinates[ALL_LIP_INDICES.indexOf(13)];
-            const bottomLip = lipCoordinates[ALL_LIP_INDICES.indexOf(14)];
-            const openness = Math.abs(bottomLip[1] - topLip[1]);
+        function addLogEntry(text) {
+            // Update big display
+            latestResult.innerText = text;
+            latestResult.style.borderColor = '#00ff88';
+            setTimeout(() => latestResult.style.borderColor = '#222', 1000);
 
-            if (openness > 0.02) {
-                predictedWord = "...";
-            } else if (predictedWord === "...") {
-                predictedWord = "—";
+            if (isFirstLog) {
+                logContainer.innerHTML = '';
+                isFirstLog = false;
             }
+
+            const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const entry = document.createElement('div');
+            entry.className = 'log_entry'; // Using distinct name to avoid style clashes
+            entry.style.cssText = "background: #1a1a1a; padding: 12px; border-radius: 10px; border-left: 3px solid #00ff88; margin-bottom: 10px;";
+            entry.innerHTML = `
+                <div style="font-size: 0.65rem; color: #444; margin-bottom: 4px;">${now}</div>
+                <div style="font-size: 1rem; font-weight: 500;">${text}</div>
+            `;
+            logContainer.prepend(entry);
         }
 
-        // ============================================
-        // ANALYZE RECORDED LIP SEQUENCE
-        // ============================================
-        async function analyzeLipSequence(frames) {
-            const API_URL = "http://localhost:8000/predict";
+        async function analyzeClips() {
+            statusText.innerText = "Processing...";
+            statusDot.classList.add('loading');
+            latestResult.innerText = "THINKING...";
+
+            const blob = new Blob(videoBlobs, { type: 'video/webm' });
+            const formData = new FormData();
+            formData.append('file', blob, 'clip.webm');
 
             try {
-                const response = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ data: frames })
-                });
+                const res = await fetch("http://localhost:8000/predict_video", { method: 'POST', body: formData });
+                const data = await res.json();
 
-                if (!response.ok) throw new Error("Server Error");
-
-                const result = await response.json();
-
-                if (result.status === "success") {
-                    aiRefinement = result.refined_sentence || "";
-                    return result.prediction;
+                if (data.status === "success") {
+                    const result = data.refined_sentence || data.prediction || "(No speech detected)";
+                    addLogEntry(result);
+                    statusText.innerText = "Idle";
                 } else {
-                    aiRefinement = "Low confidence";
-                    return "—";
+                    addLogEntry("Error: Input too short");
+                    statusText.innerText = "Idle";
                 }
             } catch (err) {
-                console.error(err);
-                aiRefinement = "Server Disconnected";
-                return "ERR";
+                addLogEntry("Connection Error: Server offline");
+                statusText.innerText = "Disconnected";
+            } finally {
+                statusDot.classList.remove('loading');
             }
         }
 
-        // ============================================
-        // RECORD BUTTON HANDLER
-        // ============================================
-        recordBtn.addEventListener('click', async () => {
-            if (!isRecording) {
-                isRecording = true;
-                recordedFrames = [];
-                recordBtn.textContent = 'Stop';
-                recordBtn.classList.remove('record-state');
-                recordBtn.classList.add('stop-state');
-                predictedWord = "—";
-                aiRefinement = "Recording...";
-                updateDetectedSpeechDisplay();
-            } else {
-                isRecording = false;
-                recordBtn.textContent = 'Record';
-                recordBtn.classList.remove('stop-state');
-                recordBtn.classList.add('record-state');
-                predictedWord = "Processing...";
-                updateDetectedSpeechDisplay();
+        recordBtn.onmousedown = async () => {
+            if (!mediaRecorder) await setupRecorder();
+            videoBlobs = [];
+            mediaRecorder.start();
+            recordBtn.innerText = "Recording...";
+            recordBtn.classList.add('active');
+            statusText.innerText = "Capturing...";
+        };
 
-                if (recordedFrames.length > 5) {
-                    predictedWord = await analyzeLipSequence(recordedFrames);
-                } else {
-                    predictedWord = "—";
-                    aiRefinement = "Too short";
+        recordBtn.onmouseup = () => {
+            mediaRecorder.stop();
+            recordBtn.innerText = "Hold to Record";
+            recordBtn.classList.remove('active');
+
+            setTimeout(async () => {
+                if (videoBlobs.length > 0) {
+                    await analyzeClips();
                 }
-                updateDetectedSpeechDisplay();
-            }
-        });
+            }, 300);
+        };
 
-        // ============================================
-        // UPDATE DETECTED SPEECH DISPLAY
-        // ============================================
-        function updateDetectedSpeechDisplay() {
-            detectedWordElement.textContent = predictedWord;
-
-            // If we have an AI refinement (from Step 4), show it below the raw prediction
-            if (aiRefinement && predictedWord !== "Processing..." && isRecording === false) {
-                const subText = document.createElement('div');
-                subText.style.fontSize = "1rem";
-                subText.style.color = "#888";
-                subText.style.marginTop = "10px";
-                subText.textContent = aiRefinement;
-                detectedWordElement.appendChild(subText);
-            }
-
-            if (predictedWord && predictedWord !== "—" && predictedWord !== "...") {
-                detectedWordElement.classList.remove('no-detection');
-                statusDot.classList.add('active');
-            } else {
-                detectedWordElement.classList.add('no-detection');
-                statusDot.classList.remove('active');
-            }
-        }
-
-        // ============================================
-        // DRAW FACE MESH ON CANVAS
-        // ============================================
-        function drawFaceMesh(landmarks) {
-            // Use MediaPipe's drawing utilities for the full mesh
-            // FACEMESH_TESSELATION draws the triangular mesh
-            drawConnectors(
-                canvasCtx,
-                landmarks,
-                FACEMESH_TESSELATION,
-                { color: '#30303030', lineWidth: 1 }  // Subtle gray mesh
-            );
-
-            // Highlight the lip contours in a different color
-            drawConnectors(
-                canvasCtx,
-                landmarks,
-                FACEMESH_LIPS,
-                { color: '#FF3030', lineWidth: 2 }  // Red for lips
-            );
-
-            // Draw small dots at each lip landmark
-            for (const index of ALL_LIP_INDICES) {
-                const landmark = landmarks[index];
-                const x = landmark.x * canvasElement.width;
-                const y = landmark.y * canvasElement.height;
-
-                canvasCtx.beginPath();
-                canvasCtx.arc(x, y, 2, 0, 2 * Math.PI);
-                canvasCtx.fillStyle = '#00FF00';  // Green dots
-                canvasCtx.fill();
-            }
-        }
-
-        // ============================================
-        // CALLBACK: PROCESS EACH FRAME
-        // ============================================
-        async function onResults(results) {
-            // Clear the canvas each frame
-            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-
-            // Draw the video frame
-            canvasCtx.drawImage(
-                results.image,
-                0, 0,
-                canvasElement.width,
-                canvasElement.height
-            );
-
-            // Check if any faces were detected
-            if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-                // Process first detected face only
-                const faceLandmarks = results.multiFaceLandmarks[0];
-
-                // Draw the mesh overlay
-                drawFaceMesh(faceLandmarks);
-
-                // Extract lip coordinates
-                const lipCoordinates = extractLipLandmarks(faceLandmarks);
-
-                // If recording, store frame data (do NOT update display)
-                if (isRecording) {
-                    recordedFrames.push(lipCoordinates);
-                    return;  // Skip real-time prediction during recording
-                }
-
-                // Run prediction model on lip coordinates (only when not recording)
-                // This updates the predictedWord variable
-                await predictFromLipMovement(lipCoordinates);
-
-                // Update the detected speech display box (every frame)
-                updateDetectedSpeechDisplay();
-
-            } else {
-                // No face detected - reset to default (only when not recording)
-                if (!isRecording) {
-                    predictedWord = "—";
-                    updateDetectedSpeechDisplay();
+        function onResults(results) {
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+            if (results.multiFaceLandmarks) {
+                for (const landmarks of results.multiFaceLandmarks) {
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_LIPS, { color: '#00ff88', lineWidth: 1.5 });
+                    for (const idx of ALL_LIP_INDICES) {
+                        const lm = landmarks[idx];
+                        canvasCtx.fillStyle = "#fff";
+                        canvasCtx.beginPath();
+                        canvasCtx.arc(lm.x * canvasElement.width, lm.y * canvasElement.height, 0.8, 0, 2 * Math.PI);
+                        canvasCtx.fill();
+                    }
                 }
             }
         }
 
-        // ============================================
-        // INITIALIZE FACE MESH
-        // ============================================
-        const faceMesh = new FaceMesh({
-            locateFile: (file) => {
-                // Load model files from CDN
-                return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
-            }
-        });
-
-        // Configure Face Mesh options
-        faceMesh.setOptions({
-            maxNumFaces: 1,              // Track only one face
-            refineLandmarks: true,       // More accurate lip/eye landmarks
-            minDetectionConfidence: 0.5, // Minimum confidence to detect
-            minTrackingConfidence: 0.5   // Minimum confidence to track
-        });
-
-        // Register our callback function
+        const faceMesh = new FaceMesh({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}` });
+        faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
         faceMesh.onResults(onResults);
 
-        // ============================================
-        // INITIALIZE WEBCAM
-        // ============================================
-        // Using MediaPipe's Camera utility for easy frame handling
         const camera = new Camera(videoElement, {
-            onFrame: async () => {
-                // Send each video frame to Face Mesh for processing
-                await faceMesh.send({ image: videoElement });
-            },
-            width: 640,
-            height: 480
+            onFrame: async () => { await faceMesh.send({ image: videoElement }); },
+            width: 640, height: 480
         });
+        camera.start();
 
-        // Start the camera
-        camera.start()
-            .then(() => {
-                console.log('Camera started successfully');
-            })
-            .catch((error) => {
-                console.error('Camera error:', error);
-                predictedWord = "CAM ERROR";
-                updateDetectedSpeechDisplay();
-            });
+        videoElement.addEventListener('loadedmetadata', () => {
+            canvasElement.width = videoElement.videoWidth;
+            canvasElement.height = videoElement.videoHeight;
+        });
     </script>
 </body>
 

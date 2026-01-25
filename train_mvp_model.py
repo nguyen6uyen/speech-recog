@@ -6,26 +6,31 @@ import os
 import glob
 from torch.utils.data import Dataset, DataLoader
 
-# --- MODEL ARCHITECTURE ---
+# --- MODEL ARCHITECTURE (IMPROVED FOR SMALL DATA) ---
 class LipReadingGRU(nn.Module):
     def __init__(self, input_dim, hidden_dim, num_classes, num_layers=2):
         super(LipReadingGRU, self).__init__()
-        # input_dim will be len(LIP_INDICES) * 2
+        # 1. Added Dropout to the GRU itself
         self.gru = nn.GRU(input_dim, hidden_dim, num_layers, 
-                          batch_first=True, bidirectional=True, dropout=0.2)
-        self.fc = nn.Linear(hidden_dim * 2, num_classes)
+                          batch_first=True, bidirectional=True, dropout=0.5)
+        
+        # 2. Added a more complex head with its own Dropout layer
+        self.fc = nn.Sequential(
+            nn.Dropout(0.5),
+            nn.Linear(hidden_dim * 2, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, num_classes)
+        )
         
     def forward(self, x):
-        # x shape: [Batch, Seq_Len, Features]
         _, h_n = self.gru(x)
-        # Concatenate the final hidden state from both directions
         out = torch.cat((h_n[-2,:,:], h_n[-1,:,:]), dim=1)
         out = self.fc(out)
         return out
 
-# --- DATASET LOADER ---
+# --- DATASET LOADER WITH RATIO FEATURES ---
 class MVPDataset(Dataset):
-    def __init__(self, data_dir, phrase_to_idx):
+    def __init__(self, data_dir, phrase_to_idx, augment=True):
         self.samples = []
         self.labels = []
         
@@ -33,25 +38,38 @@ class MVPDataset(Dataset):
         for f in file_list:
             phrase = os.path.basename(f).split('_')[0]
             if phrase in phrase_to_idx:
-                # data shape: [Seq, 42, 2]
-                data = np.load(f)
+                raw_data = np.load(f) # Shape: [Frames, 42, 2]
                 
-                processed_seq = []
-                for frame in data:
-                    # Center X and Y separately
-                    center = frame.mean(axis=0)
-                    norm_frame = frame - center
+                # Create 15 variants of EVERY sample (more intensive augmentation)
+                num_variants = 15 if augment else 1
+                for _ in range(num_variants):
+                    data = raw_data.copy()
+                    if augment:
+                        # Add coordinate noise
+                        data += np.random.normal(0, 0.003, data.shape)
+                        # Random scaling (simulating different distances)
+                        data *= np.random.uniform(0.9, 1.1)
                     
-                    # Scale to normalize for distance from camera
-                    # (Distance between corner of mouth points)
-                    scale = np.linalg.norm(norm_frame.max(axis=0) - norm_frame.min(axis=0))
-                    if scale > 0:
-                        norm_frame /= scale
+                    processed_seq = []
+                    for frame in data:
+                        # --- FEATURE ENGINEERING: GEOMETRIC RATIOS ---
+                        # These features are much more robust than raw X/Y
+                        
+                        # Lip Width (left corner to right corner)
+                        width = np.linalg.norm(frame[0] - frame[10]) + 1e-6
+                        # Inner Lip Height
+                        height = np.linalg.norm(frame[37] - frame[16])
+                        # Aspect Ratio
+                        ratio = height / width
+                        
+                        # Relative coordinates (centered)
+                        rel = (frame - frame.mean(axis=0)).flatten()
+                        
+                        # Combine: [Ratio, Raw landmarks...]
+                        processed_seq.append(np.concatenate([[ratio], rel]))
                     
-                    processed_seq.append(norm_frame.flatten())
-                
-                self.samples.append(torch.tensor(np.array(processed_seq), dtype=torch.float32))
-                self.labels.append(phrase_to_idx[phrase])
+                    self.samples.append(torch.tensor(np.array(processed_seq), dtype=torch.float32))
+                    self.labels.append(phrase_to_idx[phrase])
 
     def __len__(self):
         return len(self.samples)
@@ -61,7 +79,6 @@ class MVPDataset(Dataset):
 
 def pad_collate(batch):
     (xx, yy) = zip(*batch)
-    # Pad sequences to the same length for the batch
     xx_pad = nn.utils.rnn.pad_sequence(xx, batch_first=True, padding_value=0)
     return xx_pad, torch.tensor(yy)
 
@@ -71,24 +88,25 @@ def train():
     phrase_to_idx = {p: i for i, p in enumerate(PHRASES)}
     
     if not os.path.exists("mvp_data") or len(os.listdir("mvp_data")) == 0:
-        print("Error: No data found in 'mvp_data/'. Please run collect_mvp_data.py first.")
+        print("Error: No data found in 'mvp_data/'")
         return
 
-    dataset = MVPDataset("mvp_data", phrase_to_idx)
-    loader = DataLoader(dataset, batch_size=4, shuffle=True, collate_fn=pad_collate)
+    dataset = MVPDataset("mvp_data", phrase_to_idx, augment=True)
+    loader = DataLoader(dataset, batch_size=8, shuffle=True, collate_fn=pad_collate)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # input_dim = 42 lip points * 2 (x,y) = 84
-    model = LipReadingGRU(input_dim=84, hidden_dim=64, num_classes=len(PHRASES)).to(device)
+    device = torch.device("cpu")
+    # input_dim = 1 ratio + 84 relative coords = 85
+    model = LipReadingGRU(input_dim=85, hidden_dim=64, num_classes=len(PHRASES)).to(device)
     
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    # Weight decay (L2 Reg) is essential to combat overfitting
+    optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)
 
-    print("Starting training...")
-    for epoch in range(50):
+    print(f"Starting robust training on {len(dataset)} samples...")
+    for epoch in range(80):
+        model.train()
         total_loss = 0
         for x, y in loader:
-            x, y = x.to(device), y.to(device)
             optimizer.zero_grad()
             outputs = model(x)
             loss = criterion(outputs, y)
@@ -97,10 +115,10 @@ def train():
             total_loss += loss.item()
         
         if (epoch+1) % 10 == 0:
-            print(f"Epoch [{epoch+1}/50], Loss: {total_loss/len(loader):.4f}")
+            print(f"Epoch [{epoch+1}/80], Loss: {total_loss/len(loader):.4f}")
 
     torch.save(model.state_dict(), "mvp_lip_model.pth")
-    print("Training complete. Model saved as 'mvp_lip_model.pth'.")
+    print("Robust model saved as 'mvp_lip_model.pth'.")
 
 if __name__ == "__main__":
     train()
