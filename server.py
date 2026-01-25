@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import numpy as np
@@ -8,6 +9,15 @@ from step4_llm_layer import SentenceGenerator
 import uvicorn
 
 app = FastAPI()
+
+# Enable CORS for local development
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Initialize our modules
 predictor = LipToWordPredictor(model_path="mvp_lip_model.pth")
@@ -48,13 +58,17 @@ async def predict_lips(sequence: LipSequence):
             return {"tokens": [], "confidence": 0, "status": "low_confidence"}
             
         # 4. Optional: Run Step 4 (LLM Refinement) if it's a short phrase
-        # We can also call this separately via /refine for a list of words
-        refined = sentence_generator.generate_sentence([result['text']], [result['confidence']])
+        refined_sentence = ""
+        try:
+            refined = sentence_generator.generate_sentence([result['text']], [result['confidence']])
+            refined_sentence = refined['sentence']
+        except Exception as llm_err:
+            print(f"LLM Error: {llm_err}. Make sure Ollama is running.")
+            refined_sentence = result['text'] # Fallback to raw
         
         return {
             "prediction": result['text'],
-            "refined_sentence": refined['sentence'],
-            "alternatives": refined['alternatives'],
+            "refined_sentence": refined_sentence,
             "confidence": result['confidence'],
             "status": "success"
         }
