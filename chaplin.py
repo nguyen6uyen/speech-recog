@@ -155,98 +155,98 @@ class Chaplin:
         out = None
         frame_count = 0
 
-        while True:
-            key = cv2.waitKey(1) & 0xFF
-            if key == ord('q'):
-                # remove any remaining videos that were saved to disk
-                for file in os.listdir():
-                    if file.startswith(self.output_prefix) and file.endswith('.mp4'):
-                        os.remove(file)
-                break
+        try:
+            while True:
+                key = cv2.waitKey(1) & 0xFF
+                if key == ord('q'):
+                    break
 
-            current_time = time.time()
+                current_time = time.time()
 
-            # conditional ensures that the video is recorded at the correct frame rate
-            if current_time - last_frame_time >= self.frame_interval:
-                ret, frame = cap.read()
-                if ret:
-                    # frame compression
-                    encode_param = [
-                        int(cv2.IMWRITE_JPEG_QUALITY), self.frame_compression]
-                    _, buffer = cv2.imencode('.jpg', frame, encode_param)
-                    compressed_frame = cv2.imdecode(
-                        buffer, cv2.IMREAD_GRAYSCALE)
+                # conditional ensures that the video is recorded at the correct frame rate
+                if current_time - last_frame_time >= self.frame_interval:
+                    ret, frame = cap.read()
+                    if ret:
+                        # frame compression
+                        encode_param = [
+                            int(cv2.IMWRITE_JPEG_QUALITY), self.frame_compression]
+                        _, buffer = cv2.imencode('.jpg', frame, encode_param)
+                        compressed_frame = cv2.imdecode(
+                            buffer, cv2.IMREAD_GRAYSCALE)
 
-                    if self.recording:
-                        if out is None:
-                            output_path = self.output_prefix + \
-                                str(time.time_ns() // 1_000_000) + '.mp4'
-                            out = cv2.VideoWriter(
-                                output_path,
-                                cv2.VideoWriter_fourcc(*'mp4v'),
-                                self.fps,
-                                (frame_width, frame_height),
-                                False  # isColor
-                            )
+                        if self.recording:
+                            if out is None:
+                                import tempfile
+                                temp_dir = tempfile.gettempdir()
+                                output_path = os.path.join(temp_dir, f"{self.output_prefix}_{time.time_ns() // 1_000_000}.mp4")
+                                out = cv2.VideoWriter(
+                                    output_path,
+                                    cv2.VideoWriter_fourcc(*'mp4v'),
+                                    self.fps,
+                                    (frame_width, frame_height),
+                                    False  # isColor
+                                )
 
-                        out.write(compressed_frame)
+                            out.write(compressed_frame)
+
+                            # circle to indicate recording, only appears in the window and is not present in video saved to disk
+                            cv2.circle(compressed_frame, (frame_width - 20, 20), 10, (0, 0, 0), -1)
+
+                            frame_count += 1
+                        # check if not recording AND video is at least 2 seconds long
+                        elif not self.recording and frame_count > 0:
+                            if out is not None:
+                                out.release()
+                                out = None
+
+                            # only run inference if the video is at least 2 seconds long
+                            if frame_count >= self.fps * 2:
+                                futures.append(self.executor.submit(
+                                    self.perform_inference, output_path))
+                            else:
+                                if os.path.exists(output_path):
+                                    os.remove(output_path)
+
+                            frame_count = 0
 
                         last_frame_time = current_time
 
-                        # circle to indicate recording, only appears in the window and is not present in video saved to disk
-                        cv2.circle(compressed_frame, (frame_width -
-                                                      20, 20), 10, (0, 0, 0), -1)
+                        # display the frame in the window
+                        cv2.imshow('Chaplin', cv2.flip(compressed_frame, 1))
 
-                        frame_count += 1
-                    # check if not recording AND video is at least 2 seconds long
-                    elif not self.recording and frame_count > 0:
-                        if out is not None:
-                            out.release()
+                # ensures that videos are handled in the order they were recorded
+                for fut in futures:
+                    if fut.done():
+                        result = fut.result()
+                        # once done processing, delete the video with the video path
+                        os.remove(result["video_path"])
+                        futures.remove(fut)
+                    else:
+                        break
 
-                        # only run inference if the video is at least 2 seconds long
-                        if frame_count >= self.fps * 2:
-                            futures.append(self.executor.submit(
-                                self.perform_inference, output_path))
-                        else:
-                            os.remove(output_path)
+        finally:
+            # release everything
+            cap.release()
+            if out:
+                out.release()
+            cv2.destroyAllWindows()
 
-                        output_path = self.output_prefix + \
-                            str(time.time_ns() // 1_000_000) + '.mp4'
-                        out = cv2.VideoWriter(
-                            output_path,
-                            cv2.VideoWriter_fourcc(*'mp4v'),
-                            self.fps,
-                            (frame_width, frame_height),
-                            False  # isColor
-                        )
+            # cleanup any leftover temp files in the temp directory
+            import tempfile
+            temp_dir = tempfile.gettempdir()
+            for file in os.listdir(temp_dir):
+                if file.startswith(self.output_prefix) and file.endswith('.mp4'):
+                    try:
+                        os.remove(os.path.join(temp_dir, file))
+                    except:
+                        pass
 
-                        frame_count = 0
+            # stop global hotkey listener
+            self.hotkey.stop()
 
-                    # display the frame in the window
-                    cv2.imshow('Chaplin', cv2.flip(compressed_frame, 1))
+            # stop async event loop
+            self.loop.call_soon_threadsafe(self.loop.stop)
+            self.async_thread.shutdown(wait=True)
 
-            # ensures that videos are handled in the order they were recorded
-            for fut in futures:
-                if fut.done():
-                    result = fut.result()
-                    # once done processing, delete the video with the video path
-                    os.remove(result["video_path"])
-                    futures.remove(fut)
-                else:
-                    break
-
-        # release everything
-        cap.release()
-        if out:
-            out.release()
-        cv2.destroyAllWindows()
-
-        # stop global hotkey listener
-        self.hotkey.stop()
-
-        # stop async event loop
-        self.loop.call_soon_threadsafe(self.loop.stop)
-        self.async_thread.shutdown(wait=True)
-
-        # shutdown executor
-        self.executor.shutdown(wait=True)
+            # shutdown executor
+            self.executor.shutdown(wait=True)

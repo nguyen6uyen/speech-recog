@@ -4,10 +4,14 @@ scipy >= 1.3.0
 scikit-image >= 0.13.0
 av >= 10.0.0
 six >= 1.16.0 
-mediapipe
+mediapipe==0.10.13
 torch
 torchvision
 torchaudio
 ollama
 pydantic
 pynput
+fastapi
+uvicorn
+langchain
+langchain-ollama
