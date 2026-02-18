@@ -26,10 +26,23 @@ app.add_middleware(
 )
 
 # --- INITIALIZE VSR MODEL ---
+# --- INITIALIZE VSR MODEL ---
+# --- INITIALIZE VSR MODEL ---
 CONFIG_PATH = "./configs/LRS3_V_WER19.1.ini"
-DEVICE = "cpu"
 
-print("⏳ Loading Imperial College VSR Model (Expert Brain)...")
+# Reverting to CPU due to MPS tensor mismatch issues in ESPNet
+DEVICE = "cpu"
+print("⚠️ Using CPU for VSR Model (MPS/GPU disabled for stability).")
+
+print(f"⏳ Loading Imperial College VSR Model (Expert Brain) on {DEVICE}...")
+vsr_pro_model = InferencePipeline(
+    config_filename=CONFIG_PATH,
+    detector="mediapipe",
+    face_track=True,
+    device=DEVICE
+)
+
+print(f"⏳ Loading Imperial College VSR Model (Expert Brain) on {DEVICE}...")
 vsr_pro_model = InferencePipeline(
     config_filename=CONFIG_PATH,
     detector="mediapipe",
@@ -55,12 +68,16 @@ if not os.path.exists(TEMP_DIR):
 
 @app.get("/")
 async def root():
-    # Serve the front-end directly from the server
-    return FileResponse("index.html")
+    # Serve the front-end directly from the server, disable caching for dev
+    response = FileResponse("index.html")
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 # --- ENDPOINT 1: PRO MODEL (VIDEO BASED) ---
 @app.post("/predict_video")
-async def predict_video(file: UploadFile = File(...)):
+async def predict_video(file: UploadFile = File(...), fast_mode: bool = False):
     """
     Step 2 PRO: Uses the Imperial College Visual Transformer model.
     Accepts a video file, crops lips automatically, and returns full sentences.
@@ -83,16 +100,19 @@ async def predict_video(file: UploadFile = File(...)):
             print("⚠️ Model returned empty result. Check if mouth is visible.")
             return {"prediction": "", "refined_sentence": "", "status": "success"}
 
-        # 3. Polish with Step 4 LLM Layer
-        refined_sentence = ""
-        try:
-            # We fix the input: use a single string token
-            refined = sentence_generator.generate_sentence([raw_output], [1.0])
-            refined_sentence = refined['sentence']
-            print(f"✨ AI Refined: '{refined_sentence}'")
-        except Exception as llm_err:
-            print(f"LLM Error: {llm_err}")
-            refined_sentence = raw_output 
+        # 3. Polish with Step 4 LLM Layer (Skip if Fast Mode)
+        refined_sentence = raw_output
+        
+        if not fast_mode: 
+            try:
+                # We fix the input: use a single string token
+                refined = sentence_generator.generate_sentence([raw_output], [1.0])
+                refined_sentence = refined['sentence']
+                print(f"✨ AI Refined: '{refined_sentence}'")
+            except Exception as llm_err:
+                print(f"LLM Error: {llm_err}")
+        else:
+            print("⚡ Fast Mode: Skipping LLM refinement.")
 
         return {
             "prediction": raw_output,

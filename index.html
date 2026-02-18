@@ -4,13 +4,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CHAPLIN | Silent Speech Interface</title>
+    <title>Speech Recognition | Silent Speech Interface</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #00ff88;
-            --bg: #0a0a0a;
-            --card-bg: #111;
-            --text: #fff;
+            --primary: #C3110C;
+            --primary-glow: rgba(0, 255, 136, 0.4);
+            --bg: #D3EAF3;
+            --surface: rgba(255, 255, 255, 0.03);
+            --surface-border: rgba(255, 255, 255, 0.08);
+            --text: #000000;
+            --text-muted: #888;
         }
 
         body {
@@ -18,52 +22,74 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            background: var(--bg);
+            background-color: var(--bg);
+            background-image:
+                radial-gradient(circle at 15% 50%, rgba(0, 255, 136, 0.08), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(70, 70, 255, 0.08), transparent 25%);
             color: var(--text);
-            font-family: 'Inter', system-ui, sans-serif;
+            font-family: 'Outfit', system-ui, sans-serif;
             min-height: 100vh;
             padding: 40px 20px;
+            overflow-x: hidden;
         }
 
         h1 {
-            margin: 0 0 10px 0;
+            margin: 0 0 5px 0;
             font-weight: 700;
-            letter-spacing: -1px;
-            background: linear-gradient(to bottom right, #fff, #888);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
+            font-size: 3.5rem;
+            letter-spacing: -2px;
+            color: #000;
+            display: inline-block;
         }
 
         .status-header {
-            font-size: 0.8rem;
-            color: #666;
-            margin-bottom: 30px;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 40px;
             text-transform: uppercase;
-            letter-spacing: 2px;
+            letter-spacing: 4px;
+            font-weight: 500;
+            opacity: 0.8;
         }
 
         .main-container {
             display: grid;
-            grid-template-columns: 640px 350px;
-            gap: 20px;
-            max-width: 1100px;
+            grid-template-columns: 1fr 340px;
+            /* Sidebar slightly wider again */
+            gap: 10px;
+            /* Small gap to keep them close */
+            max-width: 1080px;
+            /* Reduced specific width to prevent huge gaps */
+            width: 100%;
+        }
+
+        /* Glassmorphism Card Style */
+        .glass-panel {
+            background: var(--surface);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 4px solid #67C090;
+            /* Off-White Border */
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
         }
 
         .video-wrapper {
             position: relative;
-            background: #000;
-            border-radius: 16px;
+            aspect-ratio: 4/3;
             overflow: hidden;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-            border: 1px solid #222;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
         }
 
         video,
         canvas {
             display: block;
-            width: 640px;
-            height: 480px;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
 
         canvas {
@@ -77,160 +103,213 @@
         .sidebar {
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 24px;
+            height: 100%;
         }
 
         .card {
-            background: var(--card-bg);
-            border: 1px solid #222;
-            border-radius: 16px;
-            padding: 20px;
+            padding: 24px;
             display: flex;
             flex-direction: column;
         }
 
         .card-header {
-            font-size: 0.75rem;
+            font-size: 1.2rem;
             color: var(--primary);
-            font-weight: 700;
-            margin-bottom: 15px;
+            font-weight: 600;
+            margin-bottom: 16px;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 1.5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #latest-result {
+            font-size: 1.8rem;
+            font-weight: 500;
+            line-height: 1.3;
+            color: #fff;
+            text-align: center;
+            padding: 30px 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 16px;
+            min-height: 140px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
         }
 
         #transcript-log {
-            height: 350px;
+            flex-grow: 1;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            padding: 5px;
+            gap: 10px;
+            padding-right: 5px;
+            max-height: 400px;
+        }
+
+        /* Custom Scrollbar */
+        #transcript-log::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #transcript-log::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #transcript-log::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
         }
 
         .log-entry {
-            background: #1a1a1a;
-            padding: 12px 16px;
-            border-radius: 10px;
-            border-left: 3px solid var(--primary);
-            animation: slideIn 0.3s ease-out;
+            background: rgba(255, 255, 255, 0.15);
+            /* More visible background */
+            padding: 14px 18px;
+            border-radius: 14px;
+            border-left: 3px solid #B5E4DD;
+            /* Match theme */
+            transition: all 0.2s;
+            margin-bottom: 8px;
+        }
+
+        .log-entry:hover {
+            background: rgba(255, 255, 255, 0.25);
+            border-left-color: #fff;
         }
 
         .log-time {
-            font-size: 0.65rem;
-            color: #444;
+            font-size: 0.75rem;
+            color: #666;
+            /* Darker gray for light theme */
             margin-bottom: 4px;
+            font-weight: 500;
         }
 
         .log-text {
-            font-size: 1rem;
+            font-size: 1.1rem;
+            /* Larger text */
+            color: #000;
             font-weight: 500;
-            color: #eee;
+            /* Removed shadow for cleaner look on light bg */
         }
 
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateX(10px);
-            }
 
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
-        .controls {
-            margin-top: 30px;
+        /* Main Layout */
+        .left-column {
             display: flex;
-            justify-content: center;
+            flex-direction: column;
+            gap: 24px;
+            align-items: center;
+        }
+
+        /* Controls Area */
+        .controls {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 100px;
+            border: 4px solid #67C090;
+            /* Off-White Border */
+            backdrop-filter: blur(10px);
         }
 
         #record-btn {
-            padding: 18px 60px;
-            font-size: 1.1rem;
-            font-weight: 700;
-            background: transparent;
-            color: var(--primary);
-            border: 2px solid var(--primary);
-            border-radius: 100px;
+            padding: 0;
+            width: 80px;
+            height: 80px;
+            /* Flower Shape */
+            border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+            background: #FFB347;
+            /* Light Orange (Idle) */
+            border: 4px solid #FFF8DE;
             cursor: pointer;
-            transition: all 0.2s;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        #record-btn:hover {
-            background: rgba(0, 255, 136, 0.1);
-            transform: scale(1.02);
-        }
-
-        #record-btn.active {
-            background: #ef4444;
-            border-color: #ef4444;
-            color: white;
-            animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-            0% {
-                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
-            }
-
-            70% {
-                box-shadow: 0 0 0 15px rgba(239, 68, 68, 0);
-            }
-
-            100% {
-                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
-            }
-        }
-
-        /* Loading Indicator */
-        .status-indicator {
+            box-shadow: 0 0 20px rgba(255, 179, 71, 0.4);
             display: flex;
             align-items: center;
-            gap: 8px;
-            font-size: 0.9rem;
-            color: #888;
+            justify-content: center;
+            position: relative;
+            transition: all 0.4s ease-in-out;
+            animation: float 6s ease-in-out infinite;
         }
 
-        .dot {
-            width: 8px;
-            height: 8px;
-            background: #333;
-            border-radius: 50%;
-        }
-
-        .dot.loading {
-            background: var(--primary);
-            box-shadow: 0 0 10px var(--primary);
-            animation: blink 1s infinite;
-        }
-
-        @keyframes blink {
-
-            0%,
-            100% {
-                opacity: 1;
+        @keyframes borderRotate {
+            0% {
+                background-position: 0% 50%;
             }
 
             50% {
-                opacity: 0.3;
+                background-position: 100% 50%;
+            }
+
+            100% {
+                background-position: 0% 50%;
             }
         }
 
-        /* Toggle Switch */
+        #record-btn::after {
+            /* Inner "center" of flower */
+            content: "";
+            width: 40%;
+            height: 40%;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+        }
+
+        #record-btn:hover {
+            box-shadow: 0 0 30px var(--primary-glow);
+            transform: scale(1.05);
+        }
+
+        #record-btn.active {
+            border-color: #ff4444;
+            color: #ff4444;
+            animation: pulse-border 1.5s infinite;
+        }
+
+        #record-btn.active::after {
+            background: #ff4444;
+            border-radius: 8px;
+            width: 24px;
+            height: 24px;
+        }
+
+        @keyframes pulse-border {
+            0% {
+                box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 20px rgba(255, 68, 68, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(255, 68, 68, 0);
+            }
+        }
+
         .toggle-container {
             display: flex;
             align-items: center;
-            gap: 10px;
-            margin-right: 20px;
+            gap: 12px;
+            background: var(--surface);
+            padding: 10px 20px;
+            border-radius: 100px;
+            border: 1px solid var(--surface-border);
+            backdrop-filter: blur(10px);
         }
 
         .switch {
             position: relative;
             display: inline-block;
-            width: 50px;
+            width: 44px;
             height: 24px;
         }
 
@@ -247,20 +326,20 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: #333;
-            transition: .4s;
-            border-radius: 34px;
+            background-color: rgba(255, 255, 255, 0.1);
+            transition: .3s;
+            border-radius: 24px;
         }
 
         .slider:before {
             position: absolute;
             content: "";
-            height: 16px;
-            width: 16px;
-            left: 4px;
-            bottom: 4px;
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
             background-color: white;
-            transition: .4s;
+            transition: .3s;
             border-radius: 50%;
         }
 
@@ -269,57 +348,114 @@
         }
 
         input:checked+.slider:before {
-            transform: translateX(26px);
+            transform: translateX(20px);
+        }
+
+        /* Loading Dots */
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            background: #444;
+            border-radius: 50%;
+        }
+
+        /* Fast Mode Toggle Specifics */
+        #fast-mode-toggle+.slider {
+            background-color: rgba(255, 195, 0, 0.3);
+            /* Lighter when OFF */
+        }
+
+        #fast-mode-toggle:checked+.slider {
+            background-color: rgb(255, 195, 0) !important;
+            /* Darker/Solid when ON */
+        }
+
+        /* Auto-Speak Toggle Specifics */
+        #auto-speak-toggle+.slider {
+            background-color: rgba(235, 76, 76, 0.3);
+            /* Lighter Red when OFF */
+        }
+
+        #auto-speak-toggle:checked+.slider {
+            background-color: #EB4C4C !important;
+            /* Solid Red when ON */
+        }
+
+        .dot.loading {
+            background: var(--primary);
+            box-shadow: 0 0 10px var(--primary);
+            animation: blink 0.8s infinite;
         }
     </style>
 </head>
 
 <body>
-    <h1>CHAPLIN</h1>
+    <h1>Speech Recognition</h1>
     <div class="status-header">Visual Speech Recognition System</div>
 
     <div class="main-container">
-        <!-- Viewport -->
-        <div class="video-wrapper">
-            <video id="video" autoplay playsinline></video>
-            <canvas id="canvas"></canvas>
+        <!-- Left Column (Video + Controls) -->
+        <div class="left-column">
+            <!-- Viewport -->
+            <div class="video-wrapper glass-panel">
+                <video id="video" autoplay playsinline></video>
+                <canvas id="canvas"></canvas>
+            </div>
+
+            <div class="controls">
+                <div class="toggle-container">
+                    <span style="font-size: 1.0rem; font-weight: 500; color: #000;">AUTO-SPEAK</span>
+                    <label class="switch">
+                        <input type="checkbox" id="auto-speak-toggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <button id="record-btn"></button>
+
+                <div class="toggle-container">
+                    <span style="font-size: 1.0rem; font-weight: 500; color: #4A0404;">⚡ FAST MODE</span>
+                    <label class="switch">
+                        <input type="checkbox" id="fast-mode-toggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
         </div>
 
         <!-- Sidebar -->
         <div class="sidebar">
-            <div class="card">
-                <div class="card-header">Target Word / Sentence</div>
-                <div id="latest-result"
-                    style="font-size: 1.8rem; font-weight: 800; color: #fff; text-align: center; padding: 20px 10px; border: 2px dashed #222; border-radius: 12px; min-height: 80px; display: flex; align-items: center; justify-content: center;">
+            <div class="card glass-panel">
+                <div class="card-header">
+                    <span>Sentence</span>
+                    <i style="opacity: 0.5; font-size: 1.2em;">LIVE</i>
+                </div>
+                <div id="latest-result">
                     READY
                 </div>
             </div>
 
-            <div class="card">
-                <div class="card-header">System Status</div>
-                <div class="status-indicator">
-                    <div id="status-dot" class="dot"></div>
-                    <span id="status-text">Idle</span>
-                </div>
-            </div>
-
-            <div class="card">
+            <div class="card glass-panel">
                 <div class="card-header">History</div>
                 <div id="transcript-log">
                 </div>
             </div>
-        </div>
-    </div>
 
-    <div class="controls">
-        <div class="toggle-container">
-            <span style="font-size: 0.9rem; color: #888;">Auto-Speak</span>
-            <label class="switch">
-                <input type="checkbox" id="auto-speak-toggle" checked>
-                <span class="slider"></span>
-            </label>
+            <div class="card glass-panel"
+                style="flex-direction: row; justify-content: space-between; align-items: center; padding: 16px 24px;">
+                <div class="status-indicator">
+                    <div id="status-dot" class="dot"></div>
+                    <span id="status-text">System Idle</span>
+                </div>
+            </div>
         </div>
-        <button id="record-btn">Hold to Record</button>
     </div>
 
     <!-- MediaPipe Scripts -->
@@ -337,6 +473,7 @@
         const statusDot = document.getElementById('status-dot');
         const recordBtn = document.getElementById('record-btn');
         const autoSpeakToggle = document.getElementById('auto-speak-toggle');
+        const fastModeToggle = document.getElementById('fast-mode-toggle');
 
         const latestResult = document.getElementById('latest-result');
         const ALL_LIP_INDICES = [
@@ -368,11 +505,10 @@
 
             const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             const entry = document.createElement('div');
-            entry.className = 'log_entry'; // Using distinct name to avoid style clashes
-            entry.style.cssText = "background: #1a1a1a; padding: 12px; border-radius: 10px; border-left: 3px solid #00ff88; margin-bottom: 10px;";
+            entry.className = 'log-entry';
             entry.innerHTML = `
-                <div style="font-size: 0.65rem; color: #444; margin-bottom: 4px;">${now}</div>
-                <div style="font-size: 1rem; font-weight: 500;">${text}</div>
+                <div class="log-time">${now}</div>
+                <div class="log-text">${text}</div>
             `;
             logContainer.prepend(entry);
         }
@@ -406,8 +542,12 @@
             const formData = new FormData();
             formData.append('file', blob, 'clip.webm');
 
+            // Check Fast Mode status
+            const isFastMode = fastModeToggle.checked;
+            const url = `http://localhost:8000/predict_video?fast_mode=${isFastMode}`;
+
             try {
-                const res = await fetch("http://localhost:8000/predict_video", { method: 'POST', body: formData });
+                const res = await fetch(url, { method: 'POST', body: formData });
                 const data = await res.json();
 
                 if (data.status === "success") {
@@ -430,19 +570,37 @@
             }
         }
 
+        let recordingStartTime = 0;
+
         recordBtn.onmousedown = async () => {
             if (!mediaRecorder) await setupRecorder();
             videoBlobs = [];
             mediaRecorder.start();
-            recordBtn.innerText = "Recording...";
+            recordingStartTime = Date.now(); // Track start time
             recordBtn.classList.add('active');
-            statusText.innerText = "Capturing...";
+            statusText.innerText = "Listening...";
+            statusDot.classList.add('loading');
         };
 
         recordBtn.onmouseup = () => {
+            const duration = Date.now() - recordingStartTime;
             mediaRecorder.stop();
-            recordBtn.innerText = "Hold to Record";
             recordBtn.classList.remove('active');
+
+            if (duration < 1000) {
+                // Too short
+                statusText.innerText = "Too Short (<1s)";
+                statusText.style.color = "#C3110C";
+                setTimeout(() => {
+                    statusText.innerText = "Idle";
+                    statusText.style.color = "var(--text-muted)";
+                }, 1500);
+                videoBlobs = []; // Discard
+                statusDot.classList.remove('loading');
+                return;
+            }
+
+            statusText.innerText = "Processing...";
 
             setTimeout(async () => {
                 if (videoBlobs.length > 0) {
@@ -471,11 +629,26 @@
         faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
         faceMesh.onResults(onResults);
 
-        const camera = new Camera(videoElement, {
-            onFrame: async () => { await faceMesh.send({ image: videoElement }); },
-            width: 640, height: 480
-        });
-        camera.start();
+        // Check for Camera Support
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            statusText.innerText = "Camera Error";
+            statusText.style.color = "#ff4444";
+            alert("Error: Camera API is missing.\n\nPlease ensure you are using a secure context:\n- Use 'http://localhost:8000'\n- Do NOT use 'file://' or insecure IP addresses.");
+        } else {
+            const camera = new Camera(videoElement, {
+                onFrame: async () => { await faceMesh.send({ image: videoElement }); },
+                width: 640, height: 480
+            });
+            camera.start()
+                .then(() => {
+                    statusText.innerText = "Camera Ready";
+                })
+                .catch(err => {
+                    console.error("Camera Start Error:", err);
+                    statusText.innerText = "Camera Denied";
+                    statusText.style.color = "#ff4444";
+                });
+        }
 
         videoElement.addEventListener('loadedmetadata', () => {
             canvasElement.width = videoElement.videoWidth;
