@@ -10,7 +10,7 @@ class SentenceGenerator:
     Uses LangChain and a local LLM (Ollama) to convert word tokens into coherent sentences.
     """
 
-    def __init__(self, model_name: str = "qwen2.5:0.5b", temperature: float = 0.2):
+    def __init__(self, model_name: str = "qwen2.5:7b", temperature: float = 0.2):
         """
         Initializes the LangChain agent with a local Ollama model.
         Defaulting to 0.5b for speed and high availability.

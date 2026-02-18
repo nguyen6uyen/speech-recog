@@ -75,7 +75,7 @@ class Chaplin:
     async def correct_output_async(self, output, sequence_num):
         # perform inference on the raw output to get back a "correct" version
         response = await self.ollama_client.chat(
-            model='qwen3:4b',
+            model='qwen2.5:7b',
             messages=[
                 {
                     'role': 'system',
