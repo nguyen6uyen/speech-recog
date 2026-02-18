@@ -1,12 +1,6 @@
-# Chaplin
+# Speech Recognition
 
-![Chaplin Thumbnail](./thumbnail.png)
-
-A visual speech recognition (VSR) tool that reads your lips in real-time and types whatever you silently mouth. Runs fully locally.
-
-Relies on a [model](https://github.com/mpc001/Visual_Speech_Recognition_for_Multiple_Languages?tab=readme-ov-file#autoavsr-models) trained on the [Lip Reading Sentences 3](https://mmai.io/datasets/lip_reading/) dataset as part of the [Auto-AVSR](https://github.com/mpc001/auto_avsr) project.
-
-Watch a demo of Chaplin [here](https://youtu.be/qlHi0As2alQ).
+A web-based interface that converts lip movements into speech to assist individuals with verbal disabilities
 
 ## Quick Start
 
