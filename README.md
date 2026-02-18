@@ -9,8 +9,8 @@ A web-based interface that converts lip movements into speech to assist individu
 First, clone the repository and navigate into the directory:
 
 ```sh
-git clone https://github.com/amanvirparhar/chaplin
-cd chaplin
+git clone git@github.com:nguyen6uyen/speech-recog.git
+cd speech-recog
 ```
 
 ### 2. Download Models
