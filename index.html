@@ -394,6 +394,64 @@
             box-shadow: 0 0 10px var(--primary);
             animation: blink 0.8s infinite;
         }
+
+        /* RESPONSIVE DESIGN FOR MOBILE */
+        @media (max-width: 900px) {
+            body {
+                padding: 20px 10px;
+            }
+
+            h1 {
+                font-size: 2.5rem;
+            }
+
+            .main-container {
+                display: flex;
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                height: auto;
+                order: 2;
+                /* Ensure it stays below video */
+            }
+
+            .left-column {
+                width: 100%;
+                order: 1;
+                /* Video on top */
+            }
+
+            .video-wrapper {
+                border-radius: 16px;
+            }
+
+            .controls {
+                flex-wrap: wrap;
+                justify-content: center;
+                padding: 15px;
+                gap: 15px;
+                width: 100%;
+                box-sizing: border-box;
+            }
+
+            .toggle-container {
+                font-size: 0.9rem;
+                padding: 8px 16px;
+            }
+
+            #record-btn {
+                width: 70px;
+                height: 70px;
+            }
+
+            #latest-result {
+                font-size: 1.4rem;
+                padding: 20px;
+                min-height: 100px;
+            }
+        }
     </style>
 </head>
 
