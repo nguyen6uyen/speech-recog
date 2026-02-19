@@ -651,20 +651,33 @@
         }
 
         let recordingStartTime = 0;
+        let isRecording = false;
 
-        recordBtn.onmousedown = async () => {
+        async function startRecording(e) {
+            if (e.cancelable) e.preventDefault(); // Prevent text selection/scrolling on mobile
+            if (isRecording) return; // Prevent double-firing
+
+            isRecording = true;
             if (!mediaRecorder) await setupRecorder();
             videoBlobs = [];
             mediaRecorder.start();
-            recordingStartTime = Date.now(); // Track start time
+            recordingStartTime = Date.now();
             recordBtn.classList.add('active');
             statusText.innerText = "Listening...";
             statusDot.classList.add('loading');
-        };
+        }
 
-        recordBtn.onmouseup = () => {
+        function stopRecording(e) {
+            if (e && e.cancelable) e.preventDefault();
+            if (!isRecording) return;
+
+            isRecording = false;
             const duration = Date.now() - recordingStartTime;
-            mediaRecorder.stop();
+
+            if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                mediaRecorder.stop();
+            }
+
             recordBtn.classList.remove('active');
 
             if (duration < 1000) {
@@ -687,7 +700,17 @@
                     await analyzeClips();
                 }
             }, 300);
-        };
+        }
+
+        // Mouse Events
+        recordBtn.addEventListener('mousedown', startRecording);
+        recordBtn.addEventListener('mouseup', stopRecording);
+        recordBtn.addEventListener('mouseleave', stopRecording); // Capture if mouse drags out
+
+        // Touch Events (Mobile)
+        recordBtn.addEventListener('touchstart', startRecording, { passive: false });
+        recordBtn.addEventListener('touchend', stopRecording, { passive: false });
+        recordBtn.addEventListener('touchcancel', stopRecording, { passive: false });
 
         function onResults(results) {
             canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
