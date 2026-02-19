@@ -2,7 +2,7 @@
 
 A web-based interface that converts lip movements into speech to assist individuals with verbal disabilities
 
-Web based: [here](https://huggingface.co/spaces/DoubleNguyen/SpeechRecognition)
+Web based through Hugging Face: [here](https://huggingface.co/spaces/DoubleNguyen/SpeechRecognition)
 
 ## Quick Start
 
