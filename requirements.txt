@@ -8,11 +8,11 @@ mediapipe==0.10.13
 torch
 torchvision
 torchaudio
-ollama
 pydantic
-pynput
 fastapi
 uvicorn
 langchain
-langchain-ollama
+langchain-google-genai
+elevenlabs
 python-multipart
+huggingface_hub

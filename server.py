@@ -13,8 +13,43 @@ from step2_lip_to_word import LipToWordPredictor
 from step3_post_processing import PostProcessor
 from step4_llm_layer import SentenceGenerator
 import uvicorn
+from elevenlabs.client import ElevenLabs
+from fastapi.responses import Response
 
 app = FastAPI()
+
+# --- ELEVENLABS CONFIG ---
+class TextPayload(BaseModel):
+    text: str
+
+@app.post("/speak")
+async def speak(payload: TextPayload):
+    """
+    Step 5: Text-to-Speech (TTS) via ElevenLabs.
+    Returns MPEG audio bytes.
+    """
+    text = payload.text
+    if not text:
+        raise HTTPException(status_code=400, detail="Text is empty")
+
+    api_key = os.environ.get("ELEVEN_LABS_API_KEY")
+    if not api_key:
+        print("⚠️ ELEVEN_LABS_API_KEY not found. Text-to-Speech will allow fallback to browser.")
+        raise HTTPException(status_code=503, detail="ElevenLabs API key missing")
+
+    try:
+        client = ElevenLabs(api_key=api_key)
+        # Using 'eleven_turbo_v2' for lowest latency conversational AI
+        audio_generator = client.generate(
+            text=text,
+            voice="Rachel", 
+            model="eleven_turbo_v2_5" 
+        )
+        audio_bytes = b"".join(audio_generator)
+        return Response(content=audio_bytes, media_type="audio/mpeg")
+    except Exception as e:
+        print(f"ElevenLabs Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Enable CORS for local development
 app.add_middleware(

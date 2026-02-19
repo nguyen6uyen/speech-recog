@@ -513,12 +513,34 @@
             logContainer.prepend(entry);
         }
 
-        function speakText(text) {
+        async function speakText(text) {
             if (!text || text.length === 0) return;
 
-            // Cancel any ongoing speech
+            // Cancel any ongoing browser speech
             window.speechSynthesis.cancel();
 
+            try {
+                // Try backend ElevenLabs TTS first
+                const response = await fetch('/speak', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text })
+                });
+
+                if (response.ok) {
+                    const audioBlob = await response.blob();
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    const audio = new Audio(audioUrl);
+                    audio.play();
+                    return;
+                } else {
+                    console.warn("Backend TTS failed, falling back to browser voice.");
+                }
+            } catch (e) {
+                console.error("TTS Error:", e);
+            }
+
+            // Fallback to Browser Voice
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.rate = 1.0;
             utterance.pitch = 1.0;
@@ -544,7 +566,7 @@
 
             // Check Fast Mode status
             const isFastMode = fastModeToggle.checked;
-            const url = `http://localhost:8000/predict_video?fast_mode=${isFastMode}`;
+            const url = `/predict_video?fast_mode=${isFastMode}`;
 
             try {
                 const res = await fetch(url, { method: 'POST', body: formData });

@@ -1,21 +1,28 @@
 from typing import List, Dict, Any, Optional
-from langchain_ollama import ChatOllama
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 import json
+import os
 
 class SentenceGenerator:
     """
     Step 4: LLM Layer - Sentence Generation.
-    Uses LangChain and a local LLM (Ollama) to convert word tokens into coherent sentences.
+    Uses LangChain and Google Gemini to convert word tokens into coherent sentences.
     """
 
-    def __init__(self, model_name: str = "qwen2.5:7b", temperature: float = 0.2):
+    def __init__(self, model_name: str = "gemini-1.5-flash", temperature: float = 0.2):
         """
-        Initializes the LangChain agent with a local Ollama model.
-        Defaulting to 0.5b for speed and high availability.
+        Initializes the LangChain agent with Google Gemini.
+        Requires GOOGLE_API_KEY environment variable.
         """
-        self.llm = ChatOllama(model=model_name, temperature=temperature)
+        api_key = os.environ.get("GOOGLE_API_KEY")
+        if not api_key:
+            print("⚠️ GOOGLE_API_KEY not found. LLM features will not work.")
+            self.llm = None
+        else:
+            self.llm = ChatGoogleGenerativeAI(model=model_name, temperature=temperature, google_api_key=api_key)
+            
         self.output_parser = StrOutputParser()
         
         # System instructions for the LLM
@@ -36,16 +43,18 @@ class SentenceGenerator:
             ("user", "Lip-read sequence: {tokens}")
         ])
 
-        self.chain = self.prompt_template | self.llm | self.output_parser
+        if self.llm:
+            self.chain = self.prompt_template | self.llm | self.output_parser
+        else:
+            self.chain = None
 
     def generate_sentence(self, tokens: List[str], confidence_scores: List[float]) -> Dict[str, Any]:
         """
         Processes a sequence of tokens and generates a refined sentence.
-        
-        :param tokens: List of word tokens mapped from Step 3.
-        :param confidence_scores: Average confidence scores from Step 2/3.
-        :return: A dictionary with the main sentence and optional alternatives.
         """
+        if not self.llm:
+            return {"sentence": " ".join(tokens), "status": "llm_disabled"}
+
         if not tokens:
             return {"sentence": "", "status": "empty"}
 
@@ -53,7 +62,6 @@ class SentenceGenerator:
         avg_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0
         
         # Determine if we should provide alternatives based on confidence
-        # If confidence is low, we ask the LLM to provide its top 3 best guesses
         if avg_confidence < 0.6:
             # Update prompt temporarily for n-best results
             n_best_prompt = (
@@ -84,43 +92,41 @@ class SentenceGenerator:
                 }
             except Exception as e:
                 print(f"Error generating alternatives: {e}")
-                # Fallback to single sentence
                 pass
 
         # Normal single-sentence generation
-        sentence = self.chain.invoke({"tokens": raw_sequence})
-        return {
-            "sentence": sentence.strip(),
-            "alternatives": [],
-            "status": "success"
-        }
+        try:
+            sentence = self.chain.invoke({"tokens": raw_sequence})
+            return {
+                "sentence": sentence.strip(),
+                "alternatives": [],
+                "status": "success"
+            }
+        except Exception as e:
+            print(f"LLM Invocation Error: {e}")
+            return {"sentence": raw_sequence, "status": "error"}
 
 # --- TEST ---
 if __name__ == "__main__":
-    # Note: This requires Ollama to be running with the specified model
-    import sys
-    
-    generator = SentenceGenerator()
-    
-    print("--- Step 4: LLM Layer Test ---")
-    
-    # Test 1: Clear sequence
-    print("\nTest 1: Normal confidence")
-    test_tokens = ["HELLO", "STOP"]
-    test_scores = [0.9, 0.8]
-    # In a real run, this call might fail if Ollama is not running, so we wrap it
-    try:
+    if not os.environ.get("GOOGLE_API_KEY"):
+        print("Please set GOOGLE_API_KEY environment variable to test.")
+    else:
+        generator = SentenceGenerator()
+        
+        print("--- Step 4: LLM Layer Test (Gemini) ---")
+        
+        # Test 1: Clear sequence
+        print("\nTest 1: Normal confidence")
+        test_tokens = ["HELLO", "STOP"]
+        test_scores = [0.9, 0.8]
         result = generator.generate_sentence(test_tokens, test_scores)
         print(f"Input: {test_tokens}")
         print(f"Output: {result['sentence']}")
-    except Exception as e:
-        print(f"Skipping live test: {e} (Is Ollama running?)")
 
-    # Test 2: Low confidence sequence
-    print("\nTest 2: Low confidence (Alternatives)")
-    test_tokens_low = ["HELP", "NO"]
-    test_scores_low = [0.4, 0.3]
-    try:
+        # Test 2: Low confidence sequence
+        print("\nTest 2: Low confidence (Alternatives)")
+        test_tokens_low = ["HELP", "NO"]
+        test_scores_low = [0.4, 0.3]
         result_low = generator.generate_sentence(test_tokens_low, test_scores_low)
         print(f"Input: {test_tokens_low}")
         if "alternatives" in result_low and result_low["alternatives"]:
@@ -128,5 +134,3 @@ if __name__ == "__main__":
             print(f"Alts: {result_low['alternatives']}")
         else:
             print(f"Output: {result_low['sentence']}")
-    except Exception as e:
-        print(f"Skipping live test: {e}")
