@@ -269,13 +269,16 @@
         }
 
         #record-btn.active {
-            border-color: #ff4444;
-            color: #ff4444;
+            background-color: #ff4444;
+            /* Turn red when recording */
+            border-color: #ff8888;
+            box-shadow: 0 0 40px rgba(255, 68, 68, 0.6);
             animation: pulse-border 1.5s infinite;
         }
 
         #record-btn.active::after {
-            background: #ff4444;
+            background: #fff;
+            /* Inner dot turns white for contrast */
             border-radius: 8px;
             width: 24px;
             height: 24px;
@@ -294,6 +297,7 @@
                 box-shadow: 0 0 0 0 rgba(255, 68, 68, 0);
             }
         }
+
 
         .toggle-container {
             display: flex;
@@ -543,20 +547,32 @@
         let videoBlobs = [];
         let isFirstLog = true;
 
-        // --- MOBILE AUDIO FIX ---
-        // Create a single AudioContext/Audio element to be unlocked by user gesture
-        let audioContextUnlocked = false;
-        const silentAudio = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAgZGF0YQQAAAAAAA==");
+        // --- ROBUST AUDIO ENGINE ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+        let audioUnlocked = false;
 
         function unlockAudio() {
-            if (audioContextUnlocked) return;
-            // Play silent audio on user gesture to unlock mobile browser audio
-            silentAudio.play().then(() => {
-                audioContextUnlocked = true;
-                console.log("Audio Unlocked for Mobile");
-            }).catch(e => console.log("Audio Unlock Failed (likely already permitted or error):", e));
+            if (audioUnlocked) return;
+
+            // Resume context if suspended (common browser policy)
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume().then(() => {
+                    console.log("AudioContext resumed/unlocked");
+                    audioUnlocked = true;
+                });
+            } else {
+                audioUnlocked = true;
+            }
+
+            // Play a silent buffer to fully unlock iOS
+            const buffer = audioCtx.createBuffer(1, 1, 22050);
+            const source = audioCtx.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioCtx.destination);
+            source.start(0);
         }
-        // ------------------------
+        // ---------------------------
 
         async function setupRecorder() {
             const stream = videoElement.srcObject;
@@ -589,11 +605,11 @@
         async function speakText(text) {
             if (!text || text.length === 0) return;
 
-            // Cancel any ongoing browser speech
+            // Cancel browser speech
             window.speechSynthesis.cancel();
 
-            // Ensure audio context is ready (should be unlocked by now)
-            if (!audioContextUnlocked) unlockAudio();
+            // Ensure audio is unlocked
+            unlockAudio();
 
             try {
                 // Try backend ElevenLabs TTS first
@@ -604,10 +620,13 @@
                 });
 
                 if (response.ok) {
-                    const audioBlob = await response.blob();
-                    const audioUrl = URL.createObjectURL(audioBlob);
-                    const audio = new Audio(audioUrl);
-                    audio.play().catch(e => console.error("Playback failed (mobile autoplay block?):", e));
+                    const arrayBuffer = await response.arrayBuffer();
+                    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+                    const source = audioCtx.createBufferSource();
+                    source.buffer = audioBuffer;
+                    source.connect(audioCtx.destination);
+                    source.start(0);
                     return;
                 } else {
                     console.warn("Backend TTS failed, falling back to browser voice.");
