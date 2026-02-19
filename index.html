@@ -543,6 +543,21 @@
         let videoBlobs = [];
         let isFirstLog = true;
 
+        // --- MOBILE AUDIO FIX ---
+        // Create a single AudioContext/Audio element to be unlocked by user gesture
+        let audioContextUnlocked = false;
+        const silentAudio = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAgZGF0YQQAAAAAAA==");
+
+        function unlockAudio() {
+            if (audioContextUnlocked) return;
+            // Play silent audio on user gesture to unlock mobile browser audio
+            silentAudio.play().then(() => {
+                audioContextUnlocked = true;
+                console.log("Audio Unlocked for Mobile");
+            }).catch(e => console.log("Audio Unlock Failed (likely already permitted or error):", e));
+        }
+        // ------------------------
+
         async function setupRecorder() {
             const stream = videoElement.srcObject;
             const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp8') ? 'video/webm;codecs=vp8' : 'video/mp4';
@@ -577,6 +592,9 @@
             // Cancel any ongoing browser speech
             window.speechSynthesis.cancel();
 
+            // Ensure audio context is ready (should be unlocked by now)
+            if (!audioContextUnlocked) unlockAudio();
+
             try {
                 // Try backend ElevenLabs TTS first
                 const response = await fetch('/speak', {
@@ -589,7 +607,7 @@
                     const audioBlob = await response.blob();
                     const audioUrl = URL.createObjectURL(audioBlob);
                     const audio = new Audio(audioUrl);
-                    audio.play();
+                    audio.play().catch(e => console.error("Playback failed (mobile autoplay block?):", e));
                     return;
                 } else {
                     console.warn("Backend TTS failed, falling back to browser voice.");
@@ -657,12 +675,14 @@
             if (e.cancelable) e.preventDefault(); // Prevent text selection/scrolling on mobile
             if (isRecording) return; // Prevent double-firing
 
+            // Unlock audio on first user interaction
+            unlockAudio();
+
             isRecording = true;
             if (!mediaRecorder) await setupRecorder();
             videoBlobs = [];
             mediaRecorder.start();
             recordingStartTime = Date.now();
-            recordBtn.classList.add('active');
             statusText.innerText = "Listening...";
             statusDot.classList.add('loading');
         }
