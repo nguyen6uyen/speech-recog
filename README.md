@@ -24,17 +24,17 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
-### 3. Install & Configure Ollama
+### 3. API Keys Configuration
+This project uses **Google Gemini** for text refinement and **ElevenLabs** for realistic speech synthesis.
 
-This project uses [Ollama](https://ollama.com/) for the LLM layer to correct the lip-reading output.
+You need to set the following environment variables before running the app:
 
-1.  **Install Ollama**: Download from [ollama.com](https://ollama.com/).
-2.  **Pull the Model**: Run the following command in your terminal to download the required model (`qwen2.5:7b`):
+```sh
+export GOOGLE_API_KEY="your_google_api_key"
+export ELEVEN_LABS_API_KEY="your_elevenlabs_api_key"
+```
 
-    ```sh
-    ollama pull qwen2.5:7b
-    ```
-3.  **Start Ollama**: Ensure Ollama is running in the background (usually `ollama serve`).
+> **Note**: You can get a free Google API key [here](https://aistudio.google.com/app/apikey) and an ElevenLabs key [here](https://elevenlabs.io).
 
 ### 4. Install Python Dependencies
 
@@ -80,4 +80,4 @@ uv run --with-requirements requirements.txt --python 3.12 main.py config_filenam
 
 -   **Camera not working?**: Try the Web Interface method (`server.py`). Browsers handle camera permissions much reliably than terminal applications.
 -   **Model not found?**: Ensure you ran `./setup.sh` and it completed successfully. Check `benchmarks/LRS3/models/` for the `.pth` file.
--   **Ollama connection error?**: Make sure Ollama is running (`ollama serve`).
+-   **LLM/TTS Error?**: Ensure `GOOGLE_API_KEY` and `ELEVEN_LABS_API_KEY` are set in your environment. Use `printenv` to verify.

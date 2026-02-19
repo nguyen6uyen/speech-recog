@@ -1,11 +1,12 @@
 import cv2
 import time
-from ollama import AsyncClient
+# Removed Ollama dependency
 from pydantic import BaseModel
 from concurrent.futures import ThreadPoolExecutor
 import os
 from pynput import keyboard
 import asyncio
+from step4_llm_layer import SentenceGenerator
 
 
 class ChaplinOutput(BaseModel):
@@ -33,8 +34,8 @@ class Chaplin:
         # setup keyboard controller for typing
         self.kbd_controller = keyboard.Controller()
 
-        # setup async ollama client
-        self.ollama_client = AsyncClient()
+        # Initialize core LLM logic (Gemini)
+        self.sentence_generator = SentenceGenerator()
 
         # setup asyncio event loop in background thread
         self.loop = asyncio.new_event_loop()
@@ -73,33 +74,31 @@ class Chaplin:
         self.recording = not self.recording
 
     async def correct_output_async(self, output, sequence_num):
-        # perform inference on the raw output to get back a "correct" version
-        response = await self.ollama_client.chat(
-            model='qwen2.5:7b',
-            messages=[
-                {
-                    'role': 'system',
-                    'content': f"You are an assistant that helps make corrections to the output of a lipreading model. The text you will receive was transcribed using a video-to-text system that attempts to lipread the subject speaking in the video, so the text will likely be imperfect. The input text will also be in all-caps, although your respose should be capitalized correctly and should NOT be in all-caps.\n\nIf something seems unusual, assume it was mistranscribed. Do your best to infer the words actually spoken, and make changes to the mistranscriptions in your response. Do not add more words or content, just change the ones that seem to be out of place (and, therefore, mistranscribed). Do not change even the wording of sentences, just individual words that look nonsensical in the context of all of the other words in the sentence.\n\nAlso, add correct punctuation to the entire text. ALWAYS end each sentence with the appropriate sentence ending: '.', '?', or '!'. \n\nReturn the corrected text in the format of 'list_of_changes' and 'corrected_text'."
-                },
-                {
-                    'role': 'user',
-                    'content': f"Transcription:\n\n{output}"
-                }
-            ],
-            format=ChaplinOutput.model_json_schema()
-        )
-
-        # get only the corrected text
-        chat_output = ChaplinOutput.model_validate_json(
-            response['message']['content'])
-
-        # if last character isn't a sentence ending (happens sometimes), add a period
-        chat_output.corrected_text = chat_output.corrected_text.strip()
-        if chat_output.corrected_text[-1] not in ['.', '?', '!']:
-            chat_output.corrected_text += '.'
-
-        # add space at the end
-        chat_output.corrected_text += ' '
+        # Use SentenceGenerator (Gemini) to refine the text
+        # Run in thread to avoid blocking the async loop
+        try:
+            tokens = output.split()
+            # Dummy confidence scores since VSR model outputs text
+            scores = [1.0] * len(tokens)
+            
+            result = await asyncio.to_thread(
+                self.sentence_generator.generate_sentence, 
+                tokens, 
+                scores
+            )
+            corrected_text = result.get('sentence', output)
+            
+            # Ensure it ends with punctuation if not present
+            corrected_text = corrected_text.strip()
+            if corrected_text and corrected_text[-1] not in ['.', '?', '!']:
+                corrected_text += '.'
+            
+            # Add space for next sentence
+            corrected_text += ' '
+            
+        except Exception as e:
+            print(f"LLM Error: {e}")
+            corrected_text = output + " "
 
         # wait until it's this task's turn to type
         async with self.typing_condition:
@@ -107,13 +106,13 @@ class Chaplin:
                 await self.typing_condition.wait()
 
             # this task's turn to type the corrected text
-            self.kbd_controller.type(chat_output.corrected_text)
+            self.kbd_controller.type(corrected_text)
 
             # increment sequence and notify next task
             self.next_sequence_to_type += 1
             self.typing_condition.notify_all()
 
-        return chat_output.corrected_text
+        return corrected_text
 
     def perform_inference(self, video_path):
         # perform inference on the video with the vsr model
