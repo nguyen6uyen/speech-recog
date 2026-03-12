@@ -4,6 +4,9 @@ A web-based interface that converts lip movements into speech to assist individu
 
 Web based through Hugging Face: [here](https://huggingface.co/spaces/DoubleNguyen/SpeechRecognition)
 
+Relies on a [model](https://github.com/mpc001/Visual_Speech_Recognition_for_Multiple_Languages?tab=readme-ov-file#autoavsr-models) trained on the [Lip Reading Sentences 3](https://mmai.io/datasets/lip_reading/) dataset as part of the [Auto-AVSR project](https://github.com/mpc001/auto_avsr).
+
+
 ## Quick Start
 
 ### 1. Project Setup
