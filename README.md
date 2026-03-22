@@ -4,6 +4,10 @@ A web-based interface that converts lip movements into speech to assist individu
 
 ![Guide](https://github.com/nguyen6uyen/speech-recog/blob/main/guide.gif)
 
+- Hold the middle button until you finish your speech, then wait to transform it to script
+- The Fast Mode toggle on if you do not want AI automatic sentence improvment
+- Auto Speak on if you want to hear the transcript out loud
+
 Web based through Hugging Face: [here](https://huggingface.co/spaces/DoubleNguyen/SpeechRecognition)
 
 Relies on a [model](https://github.com/mpc001/Visual_Speech_Recognition_for_Multiple_Languages?tab=readme-ov-file#autoavsr-models) trained on the [Lip Reading Sentences 3](https://mmai.io/datasets/lip_reading/) dataset as part of the [Auto-AVSR project](https://github.com/mpc001/auto_avsr).
