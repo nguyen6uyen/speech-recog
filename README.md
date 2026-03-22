@@ -5,7 +5,7 @@ A web-based interface that converts lip movements into speech to assist individu
 ![Guide](https://github.com/nguyen6uyen/speech-recog/blob/main/guide.gif)
 
 - Hold the middle button until you finish your speech, then wait to transform it to script
-- The Fast Mode toggle on if you do not want AI automatic sentence improvment
+- The Fast Mode toggle on if you do not want AI automatic sentence improvement
 - Auto Speak on if you want to hear the transcript out loud
 
 Web based through Hugging Face: [here](https://huggingface.co/spaces/DoubleNguyen/SpeechRecognition)
